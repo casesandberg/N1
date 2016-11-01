@@ -4,7 +4,7 @@ import fs from 'fs-plus';
 import path from 'path';
 
 import {EventedIFrame} from 'nylas-component-kit';
-import LessCompileCache from '../../../src/less-compile-cache'
+// import LessCompileCache from '../../../src/less-compile-cache'
 
 
 class ThemeOption extends React.Component {

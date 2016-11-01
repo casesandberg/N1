@@ -189,10 +189,17 @@ class ThemeManager
       fs.resolveOnLoadPath(stylesheetPath, ['css', 'less'])
 
   loadStylesheet: (stylesheetPath, importFallbackVariables) ->
-    if path.extname(stylesheetPath) is '.less'
-      @loadLessStylesheet(stylesheetPath, importFallbackVariables)
-    else
-      fs.readFileSync(stylesheetPath, 'utf8')
+    if @styleSheetDisposablesBySourcePath[stylesheetPath]
+      return @styleSheetDisposablesBySourcePath[stylesheetPath]
+
+    link = document.createElement('link')
+    link.href = stylesheetPath
+    link.rel = "stylesheet"
+    document.body.appendChild(link)
+
+    @styleSheetDisposablesBySourcePath[stylesheetPath] = new Disposable () =>
+      link.remove()
+    @styleSheetDisposablesBySourcePath[stylesheetPath]
 
   loadLessStylesheet: (lessStylesheetPath, importFallbackVariables=false) ->
     unless @lessCache?

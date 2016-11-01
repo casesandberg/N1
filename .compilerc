@@ -1,0 +1,12 @@
+{
+  "application/javascript": {
+    "presets": ["electron", "react"],
+    "sourceMaps": "inline"
+  },
+  "text/less": {
+    "pathsIncludeSeen": false,
+    "paths": ["static/variables", "static"],
+    "rootpath": "static",
+    "compress": true
+  }
+}

@@ -43,18 +43,6 @@ function setupWindow (loadSettings) {
     copyEnvFromMainProcess();
   }
 
-  var CompileCache = require('../src/compile-cache')
-
-  // TODO: Re-enable hotreloading when react-proxy is added.
-  var hotreload = false
-  CompileCache.setHotReload(hotreload)
-
-  CompileCache.setHomeDirectory(loadSettings.configDirPath)
-
-  var ModuleCache = require('../src/module-cache')
-  ModuleCache.register(loadSettings)
-  ModuleCache.add(loadSettings.resourcePath)
-
   // Start the crash reporter before anything else.
   // require('crash-reporter').start({
   //   productName: 'N1',
@@ -65,13 +53,8 @@ function setupWindow (loadSettings) {
   // })
 
   setupVmCompatibility()
-  setupCsonCache(CompileCache.getCacheDirectory())
 
   require(loadSettings.bootstrapScript)
-}
-
-function setupCsonCache (cacheDir) {
-  require('season').setCacheDir(path.join(cacheDir, 'cson'))
 }
 
 function setupVmCompatibility () {
