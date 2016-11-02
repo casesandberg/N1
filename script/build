@@ -5,6 +5,11 @@ var tmpdir = path.resolve(require('os').tmpdir(), 'nylas-build');
 var fs = require('fs-plus');
 var compile = require('electron-compile');
 
+function runPrintEnv(buildPath, electronVersion, platform, arch, callback) {
+  console.log(` -- Build path is ${buildPath}`);
+  callback();
+}
+
 function runResolveSymlinks(buildPath, electronVersion, platform, arch, callback) {
   console.log(" -- Moving symlinked node modules / internal packages into build folder.")
 
@@ -28,16 +33,25 @@ function runResolveSymlinks(buildPath, electronVersion, platform, arch, callback
 }
 
 function runElectronCompile(buildPath, electronVersion, platform, arch, callback) {
-  console.log(" -- Running electron-compile")
+  console.log(" -- Running electron-compile. For extended debug info, run with DEBUG=electron-compile:*")
 
-  const host = compile.createCompilerHostFromProjectRootSync(buildPath)
+  const cachePath = path.join(buildPath, '.cache');
+  try {
+    fs.mkdirSync(cachePath);
+  } catch (err) {
+  }
+
+  const host = compile.createCompilerHostFromProjectRootSync(buildPath, cachePath)
 
   host.compileAll(buildPath, (filepath) => {
     const relativePath = filepath.replace(buildPath).replace('undefined/', '/');
+    if (filepath.endsWith('.less')) {
+      return false;
+    }
     return relativePath.startsWith('/src') || relativePath.startsWith('/internal_packages');
   })
   .then(() => {
-    callback();
+    host.saveConfiguration().then(callback)
   })
   .catch((err) => {
     console.error(err);
@@ -61,11 +75,13 @@ var opts = {
   },
   'icon': path.resolve(__dirname, '..', 'build', 'resources', 'mac', 'nylas.icns'),
   'ignore': [
-    '^/build/',
-    '^/docs/',
-    '^/src/pro/',
-    '^/spec_integration/',
-    '^/arclib/',
+    '^/apm',
+    '^/arclib',
+    '^/build',
+    '^/docs',
+    '^/flow-typed',
+    '^/src/pro',
+    '^/spec_integration',
     '.DS_Store$',
     '.jshintrc$',
     '.npmignore$',
@@ -97,6 +113,7 @@ var opts = {
   ],
 
   'afterCopy': [
+    runPrintEnv,
     runResolveSymlinks,
     runElectronCompile,
   ]
