@@ -1,13 +1,113 @@
 #!/usr/bin/env node
-var cp = require('./utils/child-process-wrapper.js');
+var packager = require('electron-packager');
 var path = require('path');
+var tmpdir = path.resolve(require('os').tmpdir(), 'nylas-build');
+var fs = require('fs-plus');
+var compile = require('electron-compile');
 
-process.chdir(path.dirname(__dirname));
+function runResolveSymlinks(buildPath, electronVersion, platform, arch, callback) {
+  console.log(" -- Moving symlinked node modules / internal packages into build folder.")
 
-cp.safeExec('node script/bootstrap', function() {
-  // build/node_modules/.bin/grunt "$@"
-  var gruntPath = path.join('build', 'node_modules', '.bin', 'grunt') + (process.platform === 'win32' ? '.cmd' : '');
-  var args = ['--gruntfile', path.resolve('build', 'Gruntfile.coffee')];
-  args = args.concat(process.argv.slice(2));
-  cp.safeSpawn(gruntPath, args, process.exit);
+  const dirs = [
+    path.join(buildPath, 'internal_packages'),
+    path.join(buildPath, 'node_modules')
+  ];
+
+  dirs.forEach((dir) => {
+    fs.readdirSync(dir).forEach((packageName) => {
+      const packagePath = path.join(dir, packageName)
+      const realPackagePath = fs.realpathSync(packagePath).replace('/private/', '/')
+      if (realPackagePath !== packagePath) {
+        fs.removeSync(packagePath);
+        fs.copySync(realPackagePath, packagePath);
+      }
+    });
+  });
+
+  callback();
+}
+
+function runElectronCompile(buildPath, electronVersion, platform, arch, callback) {
+  console.log(" -- Running electron-compile")
+
+  const host = compile.createCompilerHostFromProjectRootSync(buildPath)
+
+  host.compileAll(buildPath, (filepath) => {
+    const relativePath = filepath.replace(buildPath).replace('undefined/', '/');
+    return relativePath.startsWith('/src') || relativePath.startsWith('/internal_packages');
+  })
+  .then(() => {
+    callback();
+  })
+  .catch((err) => {
+    console.error(err);
+  });
+};
+
+var opts = {
+  'dir': path.resolve(__dirname, '..'),
+  'tmpdir': tmpdir,
+  'app-copyright': 'Copyright 2014-2016 Nylas',
+  'derefSymlinks': false,
+  'asar': {
+    'unpack': "{" + [
+      '*.node',
+      '**/vendor/**',
+      'examples/**',
+      '**/src/tasks/**',
+      '**/node_modules/spellchecker/**',
+      '**/node_modules/windows-shortcuts/**',
+    ].join(',') + "}",
+  },
+  'icon': path.resolve(__dirname, '..', 'build', 'resources', 'mac', 'nylas.icns'),
+  'ignore': [
+    '^/build/',
+    '^/docs/',
+    '^/src/pro/',
+    '^/spec_integration/',
+    '^/arclib/',
+    '.DS_Store$',
+    '.jshintrc$',
+    '.npmignore$',
+    '.pairs$',
+    '.travis.yml$',
+    'appveyor.yml$',
+    '.idea$',
+    '.editorconfig$',
+    '.lint$',
+    '.lintignore$',
+    '.arcconfig$',
+    '.flowconfig$',
+    '.jshintignore$',
+    '.gitattributes$',
+    '.gitkeep$',
+    '.pdb$',
+    '.cc$',
+    '.h$',
+    'binding.gyp$',
+    'target.mk$',
+    '.node.dYSM$',
+    '@paulbetts[\\\/]+cld[\\\/]+deps[\\\/]+cld',
+  ],
+  'out': path.resolve(__dirname, '..', 'dist'),
+  'overwrite': true,
+  'extend-info': path.resolve(__dirname, '..', 'build', 'resources', 'mac', 'nylas-Info.plist'),
+  'extra-resource': [
+    path.resolve(__dirname, '..', 'build', 'resources', 'mac', 'Nylas Calendar.app'),
+  ],
+
+  'afterCopy': [
+    runResolveSymlinks,
+    runElectronCompile,
+  ]
+}
+console.log('----- Running build with options:');
+console.log(JSON.stringify(opts, null, 2));
+
+packager(opts, (err, appPaths) => {
+  if (err) {
+    console.error(err);
+    return;
+  }
+  console.log(`Done: ${appPaths}`);
 });
